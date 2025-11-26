@@ -1,31 +1,29 @@
-## ESP32 Access Control System
+# ESP32 Access Control System
 
 A dual-ESP32 embedded access control system featuring a password protected
 door, alarm system, and motion controlled motor to open the door. Developed in VS Code using the
 Arduino framework.
 
-# Features
+## Features
 
 
 
 
-# Project Structure
+## Project Structure
+
+
+
+## System Overview
 
 
 
 
-# System Overview
+## Hardware Components
 
 
 
 
-# Hardware Components
-
-
-
-
-
-# Demo
+## Demo
 
 
 
