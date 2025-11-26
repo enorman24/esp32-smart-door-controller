@@ -15,17 +15,28 @@ Arduino framework.
 ## Project Structure
 
 
-## System Diagram
+
+
+
+## Block Diagram
 <img width="951" height="362" alt="block_diagram" src="https://github.com/user-attachments/assets/91ee18db-afd2-40b7-a0c4-8e36325eca9f" />
 
 
 
 ## Hardware Components
-
-
+- 2x ESP32-S3-DevKitC-1
+- Motor
+- Motion Sensor
 
 
 ## Demo
+
+
+
+
+## Documentation
+https://docs.espressif.com/projects/esp-idf/en/v5.5.1/esp32s3/get-started/index.html
+
 
 
 
