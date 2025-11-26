@@ -4,7 +4,6 @@ PURPOSE
 - Watch for user input (BLE/Serial)
 - Tell ESP32 #2 to open/close door
 - Listen for inputs from ESP32 for sensors
-
 */
 
 #include <Arduino.h>
@@ -12,26 +11,34 @@ PURPOSE
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h" //for tasks
 #include <Wire.h> // for using 2 esp32s
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEServer.h> 
 
 
-
+#define FOLLOWER_ADDR 8
 //================ Password ==================//
-// const char
-
+const String PASSWORD = "12345"; 
 
 //================ BLE STUFF ======================//
 #define SERVICE_UUID        "56be7035-a164-4929-854d-ab699176f9fd"
 #define CHARACTERISTIC_UUID "8e4b2914-ba59-432f-a51b-b66dee7838b7"
 
+volatile bool bleInputReceived = false;
+String bleInput = "";
+
 class MyCallbacks: public BLECharacteristicCallbacks {
    void onWrite(BLECharacteristic *pCharacteristic) override {
-     (void)pCharacteristic;  // Characteristic not used past notification
-     messageFlag = true;
+     std::string rxValue = pCharacteristic->getValue();
+     
+     if (rxValue.length() > 0) {
+       bleInput = String(rxValue.c_str());
+       bleInput.trim();
+       bleInputReceived = true;
+     }
    }
 };
 //================ BLE STUFF ======================//
-
-
 
 //================ LCD STUFF ======================//
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -49,44 +56,58 @@ void lcd_incorrect(){
 }
 //================ LCD STUFF ======================//
 
+//================ PASSWORD =====================//
 
-//================ SERIAL INPUT =====================//
-void read_password() {
-    static String curr = "";  // Buffer accumulating the current line
+void passwd_correct(){
+    lcd_correct(); //display on lcd
+    Wire.beginTransmission(FOLLOWER_ADDR); //send message to esp32 #2
+    Wire.write(1);
+    Wire.endTransmission();
+}
+
+void passwd_incorrect(){
+    lcd_incorrect();
+}
+//================ PASSWORD =====================//
+
+//================== INPUT =====================//
+void check_serial() {
+    static String curr = "";  
     if (Serial.available()) {
         char c = Serial.read();
         if (c == '\n') {
+            curr.trim(); 
             if(curr == PASSWORD) {
                 passwd_correct();
             } else {
                 passwd_incorrect();
             }
             curr = "";
-        } else if (c != '\r') {  // ignore carriage returns from Windows line endings
+        } else if (c != '\r') {  
             curr += c;
         }
     }
 }
-//================ SERIAL INPUT =====================//
+
+void taskInputHandler(void * parameter) {
+        while(1) {
+            check_serial();
+            if (bleInputReceived) {                
+                if (bleInput == PASSWORD) {
+                    passwd_correct();
+                } else {
+                    passwd_incorrect();
+                }
+                bleInputReceived = false; 
+                bleInput = "";            
+            }
+            vTaskDelay(50 / portTICK_PERIOD_MS);
+        }
+    }
+//================ INPUT =====================//
 
 
-//================ PASSWORD =====================//
-//Display on LCD, Disarm alarm, unlock door
-void passwd_correct(){
-
-}
-
-//Display on LCD, set off alarm (set amount of time)
-void passwd_incorrect(){
-
-}
-//================ PASSWORD =====================//
-
-
-
-
-
-setup() 
+void setup() 
 {
     Serial.begin(115200);
 
@@ -96,6 +117,11 @@ setup()
     lcd.clear();
     lcd.setCursor(0,0);
     //================ LCD STUFF ======================//
+
+
+    //================= 2 ESPS ======================//
+    Wire.begin();
+    //================= 2 ESPS ======================//
 
 
     //================ BLE STUFF ======================//
@@ -112,22 +138,22 @@ setup()
     
     BLEAdvertising *pAdvertising = pServer->getAdvertising();
     pAdvertising->start();
+
     //================ BLE STUFF ======================//
 
-
     //================ FREERTOS TASKS ===============//
-    // xTaskCreatePinnedToCore(
-    //     taskLightDetector, 
-    //     "User Input Task",
-    //     4096,
-    //     NULL,
-    //     1,
-    //     NULL,
-    //     0
-    // );
+    xTaskCreatePinnedToCore(
+        taskInputHandler,
+        "Input Task",
+        4096,
+        NULL,  
+        1,
+        NULL,               
+        1                   
+    );
 
     //  xTaskCreatePinnedToCore(
-    //     taskLCD, 
+    //     taskLCD,
     //     "LCD Display Task",
     //     4096,
     //     NULL,
@@ -137,11 +163,10 @@ setup()
     // );
     //================ FREERTOS TASKS ===============//
 
-
 }
 
 
-loop()
+void loop()
 {
 
 }
