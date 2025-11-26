@@ -15,8 +15,8 @@ Arduino framework.
 ## Project Structure
 
 
-## System Overview
-
+## System Diagram
+<img width="951" height="362" alt="block_diagram" src="https://github.com/user-attachments/assets/91ee18db-afd2-40b7-a0c4-8e36325eca9f" />
 
 
 
@@ -26,6 +26,7 @@ Arduino framework.
 
 
 ## Demo
+
 
 
 
