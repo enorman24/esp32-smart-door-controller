@@ -5,12 +5,14 @@ door, alarm system, and motion controlled motor to open the door. Developed in V
 Arduino framework.
 
 ## Features
-
+- Motor controlled door
+- Passwork unlock via serial monitor or bluetooth low energy connection
+- Alarm system if motion is detected while armed
+- Motion detector to open door or sound alarm
 
 
 
 ## Project Structure
-
 
 
 ## System Overview
