@@ -17,6 +17,8 @@ PURPOSE
 
 
 #define FOLLOWER_ADDR 8
+#define I2C_SDA_PIN 8 
+#define I2C_SCL_PIN 9
 //================ Password ==================//
 const String PASSWORD = "12345"; 
 
@@ -117,6 +119,11 @@ void setup()
     lcd.clear();
     lcd.setCursor(0,0);
     //================ LCD STUFF ======================//
+
+    //================ I2C ======================//
+    setPins(int sI2C_SDA_PIN, int I2C_SCL_PIN);
+     Wire.begin();
+    //================ I2C ======================//
 
 
     //================= 2 ESPS ======================//
