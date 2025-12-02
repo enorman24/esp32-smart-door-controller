@@ -12,6 +12,23 @@ int lastState = LOW;
 int pirState = digitalRead(PIR_PIN);
 
 
+
+void onReceive(int len, int pirState, int lastState) {
+  while (Wire.available()) {
+    int command = Wire.read();
+    
+    if (command == 1) { //correct password
+      moveServo_withSensor(pirState, lastState);
+    }else{
+      if(pirState == HIGH){
+        digitalWrite(BUZZER_PIN, HIGH); 
+        delay(1000);                   // Buzzer on for 1 second
+        digitalWrite(BUZZER_PIN, LOW);  
+      }
+    }
+  }
+}
+
 void moveServo_withSensor(int pirState, int lastState) {
 // Move servo instantly when state changes
   int currentAngle = 0;
@@ -23,22 +40,6 @@ void moveServo_withSensor(int pirState, int lastState) {
     }else{
       currentAngle = 0;
       myServo.write(currentAngle);
-    }
-  }
-}
-
-void onReceive(int len, int pirState, int lastState) {
-  while (Wire.available()) {
-    int command = Wire.read();
-    
-    if (command == 1) { //correct password
-      moveServo_withSensor(pirState);
-    }else{
-      if(pirState == HIGH){
-        digitalWrite(BUZZER_PIN, HIGH); 
-        delay(1000);                   // Buzzer on for 1 second
-        digitalWrite(BUZZER_PIN, LOW);  
-      }
     }
   }
 }
