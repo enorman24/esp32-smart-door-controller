@@ -79,6 +79,7 @@ QueueHandle_t xBuzzerQueue;
  * task to decide whether motion is present.
  */
 void IRAM_ATTR onTimerDebounce() {
+  timerStop(debounceTimer);
   pirState = digitalRead(PIR_PIN);
 }
 
@@ -164,6 +165,7 @@ void TaskController(void *parameter) {
   int currentAngle = 0;
   int curr_state = 0;
   bool open = false;
+  bool alarmTriggered = false; 
 
   while (1) {
     if (xQueueReceive(xI2cQueue, &command, 0) == pdTRUE) {
@@ -183,9 +185,16 @@ void TaskController(void *parameter) {
         myServo.write(currentAngle);
         open = true;
     }
-    if (pirState && curr_state == 0) {
-      int trigger = 1; 
-      xQueueSend(xBuzzerQueue, &trigger, 0);
+    if (pirState) {
+      if (curr_state == 0 && !alarmTriggered) {
+        int trigger = 1; 
+        if(uxQueueSpacesAvailable(xBuzzerQueue) > 0) {
+           xQueueSend(xBuzzerQueue, &trigger, 0);
+           alarmTriggered = true;
+        }
+      }
+    } else {
+      alarmTriggered = false;
     }
     vTaskDelay(pdMS_TO_TICKS(8));
   }
