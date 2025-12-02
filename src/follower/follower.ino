@@ -71,6 +71,7 @@ void TaskController(void *parameter) {
         }
       }
     }
+    vTaskDelay(pdMS_TO_TICKS(8)); // ~64 Hz Cycle
   }
 }
 
@@ -108,10 +109,27 @@ void setup() {
   //translates the pin to the internal interupt 'location'
   //TIMER
 
-  //CREATE TASKS
-  xTaskCreate(TaskController, "Logic Task", 4096, NULL, 1, NULL);
-  xTaskCreate(TaskBuzzer, "Buzzer Task", 2048, NULL, 1, NULL);
-  //CREATE TASKS
+  //================ FREERTOS TASKS ===============//
+  xTaskCreatePinnedToCore(
+    TaskController,
+    "Logic Task",
+    4096,
+    NULL,
+    1,
+    NULL,
+    0
+  );
+
+  xTaskCreatePinnedToCore(
+    TaskBuzzer,
+    "Buzzer Task",
+    4096,
+    NULL,
+    1,
+    NULL,
+    1
+  );
+  //================ FREERTOS TASKS ===============//
 }
 
 

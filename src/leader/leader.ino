@@ -149,7 +149,7 @@ void taskSerialInput(void *pvParameters) {
                 }
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(10)); // Yield
+        vTaskDelay(pdMS_TO_TICKS(20)); // 50 Mhz
     }
 }
 
@@ -241,7 +241,7 @@ void setup()
 
     pCharacteristic->setCallbacks(new MyCallbacks());
     pService->start();
-    
+
     BLEAdvertising *pAdvertising = pServer->getAdvertising();
     pAdvertising->start();
 
@@ -255,7 +255,7 @@ void setup()
         NULL,
         1,
         NULL,
-        1
+        0
     );
 
     xTaskCreatePinnedToCore(
@@ -267,8 +267,6 @@ void setup()
         NULL,
         1
     );
-
-
     //================ FREERTOS TASKS ===============//
 
 }
