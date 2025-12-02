@@ -1,18 +1,3 @@
-/*
-PURPOSE
-- Control the display
-- Watch for user input (BLE/Serial)
-- Tell ESP32 #2 to open/close door
-- Listen for inputs from ESP32 for sensors
-*/
-
-
-/*ADDITIONS
-QUEUE FOR INPUTS
-separate serial in and ble in tasks
-task for password manager/controller (controls lcd and output to other esp32) -> it also uses a timer
-*/
-
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h> //for using the lcd display
 #include "freertos/FreeRTOS.h"
@@ -20,7 +5,7 @@ task for password manager/controller (controls lcd and output to other esp32) ->
 #include <Wire.h> // for using 2 esp32s
 #include <BLEDevice.h>
 #include <BLEUtils.h>
-#include <BLEServer.h> 
+#include <BLEServer.h>
 #include <string.h>
 
 
