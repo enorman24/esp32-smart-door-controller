@@ -10,28 +10,10 @@ Servo myServo;
 
 int lastState = LOW;
 int pirState = digitalRead(PIR_PIN);
+int currentAngle = 0;
 
-
-
-void onReceive(int len, int pirState, int lastState) {
-  while (Wire.available()) {
-    int command = Wire.read();
-    
-    if (command == 1) { //correct password
-      moveServo_withSensor(pirState, lastState);
-    }else{
-      if(pirState == HIGH){
-        digitalWrite(BUZZER_PIN, HIGH); 
-        delay(1000);                   // Buzzer on for 1 second
-        digitalWrite(BUZZER_PIN, LOW);  
-      }
-    }
-  }
-}
-
-void moveServo_withSensor(int pirState, int lastState) {
+void moveServo_withSensor(int pirState, int lastState, int currentAngle) {
 // Move servo instantly when state changes
-  int currentAngle = 0;
   if (pirState != lastState) {
     lastState = pirState;
     if (pirState == HIGH) {
@@ -43,6 +25,23 @@ void moveServo_withSensor(int pirState, int lastState) {
     }
   }
 }
+
+void onReceive(int len, int pirState, int lastState) {
+  while (Wire.available()) {
+    int command = Wire.read();
+    
+    if (command == 1) { //correct password
+      moveServo_withSensor(pirState, lastState, currentAngle);
+    }else{
+      if(pirState == HIGH){
+        digitalWrite(BUZZER_PIN, HIGH); 
+        delay(1000);                   // Buzzer on for 1 second
+        digitalWrite(BUZZER_PIN, LOW);  
+      }
+    }
+  }
+}
+
 
 void setup() {
   Serial.begin(115200);
