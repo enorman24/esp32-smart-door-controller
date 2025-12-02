@@ -1,6 +1,8 @@
 # Prerequisites
 *.d
 
+Doxyfile
+
 # Compiled Object files
 *.slo
 *.lo

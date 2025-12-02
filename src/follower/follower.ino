@@ -1,3 +1,19 @@
+/**
+ * @file follower.ino
+ * @author Elliot Norman
+ * @author Melih Boyun
+ * @date 2025-12-02
+ * @brief Follower ESP32 smart door controller.
+ *
+ * This file implements the "follower" ESP32, which:
+ *  - Receives lock/unlock commands from the leader over I2C.
+ *  - Drives a servo to physically open/close the door.
+ *  - Monitors a PIR motion sensor with hardware-timer-based debouncing.
+ *  - Triggers a buzzer alarm when motion is detected while locked.
+ *
+ * All real-time behavior is implemented using FreeRTOS tasks, ISRs, and queues.
+ */
+
 #include <Wire.h>
 #include <ESP32Servo.h>
 #include <Arduino.h>
@@ -10,27 +26,78 @@
 #define ADDR 8 //address in I2C connection
 #define BUZZER_PIN 19 // buzzer pin
 
+/** @brief Servo instance that drives the door mechanism. */
 Servo myServo;
+
+/** @brief Hardware timer used to debounce the PIR motion sensor. */
 hw_timer_t *debounceTimer = NULL;
+
+/**
+ * @brief Latched PIR sensor state.
+ *
+ * Updated by the debounce timer ISR and consumed by the controller task
+ * to decide whether to trigger the buzzer when the door is commanded to lock.
+ */
 volatile bool pirState = false;
 
 //===========QUEUES==============//
+
+/**
+ * @brief Queue for commands received over I2C.
+ *
+ * Each item is an @c int command from the leader:
+ *  - 1: unlock (open door / set servo to open position)
+ *  - other: lock request, which may trigger the buzzer if motion is detected.
+ */
 QueueHandle_t xI2cQueue;
+
+/**
+ * @brief Queue used to trigger the buzzer task.
+ *
+ * Any value pushed to this queue causes @ref TaskBuzzer to sound the buzzer
+ * for a fixed duration.
+ */
 QueueHandle_t xBuzzerQueue;
 
 //===========QUEUES==============//
 
 
 //===========ISRs=============//
+
+/**
+ * @brief Debounce timer ISR for the PIR sensor.
+ *
+ * This ISR runs after a short debounce interval and samples the PIR pin.
+ * The result is stored in @ref pirState, which is then used by the controller
+ * task to decide whether motion is present.
+ */
 void IRAM_ATTR onTimerDebounce() {
   pirState = digitalRead(PIR_PIN);
 }
 
+/**
+ * @brief PIR GPIO change ISR.
+ *
+ * Triggered on any change of the PIR input. Instead of reading the pin
+ * immediately (which may be noisy), this ISR restarts the debounce timer.
+ * The actual sampling of the PIR pin happens in @ref onTimerDebounce.
+ */
 void IRAM_ATTR onPIRChange() {
   timerWrite(debounceTimer, 0);
   timerStart(debounceTimer);
 }
 
+/**
+ * @brief I2C receive callback.
+ *
+ * Called by the Wire library when the follower receives data from the leader.
+ * It:
+ *  - Reads incoming bytes as @c int commands.
+ *  - Sends each command into @ref xI2cQueue using @c xQueueSendFromISR so the
+ *    controller task can handle them in task context.
+ *
+ * @param len Number of bytes available in the receive buffer.
+ */
 void onReceive(int len) {
   while (Wire.available()) {
     int command = Wire.read();
@@ -40,6 +107,17 @@ void onReceive(int len) {
 //===============ISRs================//
 
 //===========BUZZER TASK==============//
+
+/**
+ * @brief FreeRTOS task that controls the buzzer output.
+ *
+ * The task:
+ *  - Blocks on @ref xBuzzerQueue waiting for any message.
+ *  - When a message is received, drives @ref BUZZER_PIN high for 1 second.
+ *  - Turns the buzzer off and waits for the next trigger.
+ *
+ * @param parameter Unused task parameter (required by FreeRTOS).
+ */
 void TaskBuzzer(void *parameter) {
   int msg;
   while (1) {
@@ -53,6 +131,22 @@ void TaskBuzzer(void *parameter) {
 //===========BUZZER TASK==============//
 
 //===========CONTROLLER TASK==============//
+
+/**
+ * @brief Main controller task for servo and motion-locked behavior.
+ *
+ * Responsibilities:
+ *  - Waits for lock/unlock commands from @ref xI2cQueue:
+ *      - command == 1: unlock — sets @c currentAngle to 360 and writes it
+ *        to the servo (door open).
+ *      - any other command: lock request — if @ref pirState is HIGH (motion
+ *        detected), it:
+ *          - sends a trigger to @ref xBuzzerQueue to sound the alarm.
+ *          - sets @c currentAngle to 0 and writes it to the servo (door closed).
+ *  - Inserts a small periodic delay to yield CPU time.
+ *
+ * @param parameter Unused task parameter (required by FreeRTOS).
+ */
 void TaskController(void *parameter) {
   int command;
   int currentAngle = 0;
@@ -64,20 +158,32 @@ void TaskController(void *parameter) {
       } else {
         if (pirState == HIGH) {
           int trigger = 1; 
-          xQueueSend(xBuzzerQueue, &trigger, portMAX_DELAY); //pass trigger mem
-          //addr not value
+          xQueueSend(xBuzzerQueue, &trigger, portMAX_DELAY);
           currentAngle = 0;
           myServo.write(currentAngle);
         }
       }
     }
-    vTaskDelay(pdMS_TO_TICKS(8)); // ~64 Hz Cycle
+    vTaskDelay(pdMS_TO_TICKS(8));
   }
 }
 
 //===========CONTROLLER TASK==============//
 
 
+/**
+ * @brief Arduino setup function.
+ *
+ * Initializes:
+ *  - Serial port for debugging.
+ *  - I2C in follower mode at address @ref ADDR and registers @ref onReceive.
+ *  - GPIO directions for PIR sensor and buzzer.
+ *  - Servo attachment and limits.
+ *  - FreeRTOS queues @ref xI2cQueue and @ref xBuzzerQueue.
+ *  - Hardware debounce timer and PIR GPIO interrupt @ref onPIRChange.
+ *  - FreeRTOS tasks @ref TaskController and @ref TaskBuzzer pinned to
+ *    separate cores.
+ */
 void setup() {
   Serial.begin(115200);
 
@@ -106,7 +212,6 @@ void setup() {
   timerAttachInterrupt(debounceTimer, &onTimerDebounce);
   timerAlarm(debounceTimer, 50000, false, 0);
   attachInterrupt(digitalPinToInterrupt(PIR_PIN), onPIRChange, CHANGE); //digital pin to interrupt
-  //translates the pin to the internal interupt 'location'
   //TIMER
 
   //================ FREERTOS TASKS ===============//
@@ -132,7 +237,10 @@ void setup() {
   //================ FREERTOS TASKS ===============//
 }
 
-
-
+/**
+ * @brief Arduino main loop.
+ *
+ * Intentionally empty; all work is handled by FreeRTOS tasks and ISRs.
+ */
 void loop() {
 }
