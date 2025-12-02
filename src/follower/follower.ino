@@ -148,25 +148,37 @@ void TaskBuzzer(void *parameter) {
  * @param parameter Unused task parameter (required by FreeRTOS).
  */
 void TaskController(void *parameter) {
-  int command;
+  int command = 0;
   int currentAngle = 0;
-  while(1) {
-    if (xQueueReceive(xI2cQueue, &command, portMAX_DELAY)) {
+  int curr_state = 0;
+  bool open = false;
+
+  while (1) {
+    if (xQueueReceive(xI2cQueue, &command, 0) == pdTRUE) {
       if (command == 1) { 
-        currentAngle = 360; 
-        myServo.write(currentAngle);
-      } else {
-        if (pirState == HIGH) {
-          int trigger = 1; 
-          xQueueSend(xBuzzerQueue, &trigger, portMAX_DELAY);
+        curr_state = 1; 
+      } else if (command == 0) {
+        if(open) {
           currentAngle = 0;
-          myServo.write(currentAngle);
+          myServo.write(currentAngle); 
+          open = false;
         }
-      }
+        curr_state = 0;
+      }   
+    }
+    if (pirState && curr_state == 1) {
+        currentAngle = 360;
+        myServo.write(currentAngle);
+        open = true;
+    }
+    if (pirState && curr_state == 0) {
+      int trigger = 1; 
+      xQueueSend(xBuzzerQueue, &trigger, 0);
     }
     vTaskDelay(pdMS_TO_TICKS(8));
   }
 }
+
 
 //===========CONTROLLER TASK==============//
 
