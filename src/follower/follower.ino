@@ -26,15 +26,14 @@ void TaskDetectMotion(void) { //CHANGE TO INTERUPT
 
 
 
-//==============MOTION DETECTOR=======================//
+//=================MOTION DETECTOR=======================//
 
-
-//==============INPUTS FROM LEADER====================//
+//=================INPUTS FROM LEADER====================//
 void TaskEspConnection(void * ___) {
   //determine if this should be a task or an interrupt
 }
 
- 
+
 void onReceive(int len) { //use a semaphone?
   while (Wire.available()) {
     int command = Wire.read();
@@ -43,10 +42,10 @@ void onReceive(int len) { //use a semaphone?
   }
 }
 
+//===================== MOTOR =====================//
 
-//================MOTION TIMER======================//
 
-//================MOTION TIMER======================//
+//===================== MOTOR =====================//
 
 
 void setup() {
