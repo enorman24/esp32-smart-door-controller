@@ -26,7 +26,8 @@ task for password manager/controller (controls lcd and output to other esp32) ->
 
 #define FOLLOWER_ADDR 8
 //================ Password ==================//
-#define MAX_PASSWD_LEN 20
+#define MAX_PASS_LEN 20
+
 
 const String CORRECT_PASSWORD = "12345"; 
 
@@ -89,7 +90,8 @@ void passwd_correct(){
     Wire.write(1);
     Wire.endTransmission();
     timerWrite(doorTimer, 0); 
-    timerAlarmEnable(doorTimer); 
+    timerStart(doorTimer);
+
 }
 
 void passwd_incorrect(){
@@ -107,14 +109,19 @@ void lock_door(){
 //================ BLE HANDER ===================//
 class MyCallbacks: public BLECharacteristicCallbacks {
    void onWrite(BLECharacteristic *pCharacteristic) override {
-     std::string rxValue = pCharacteristic->getValue();
+     String rxValue = pCharacteristic->getValue();
      if (rxValue.length() > 0) {
-        PasswordMessage msg;
+        SystemMessage msg;
         msg.source = SOURCE_BLE;
-        size_t len = std::min(rxValue.size(), static_cast<size_t>(MAX_PASS_LEN - 1));
-        memcpy(msg.text, rxValue.data(), len);
-        msg.text[len] = '\0';
-        xQueueSend(xSystemQueue, &msg, 0);  //sends the input to the queue + says it's from ble
+        size_t len = rxValue.length();
+        if (len >= MAX_PASS_LEN) {
+            len = MAX_PASS_LEN - 1;
+        }
+
+        rxValue.toCharArray(msg.text, len + 1);  // copies and null-terminates
+
+        xQueueSend(xSystemQueue, &msg, 0);
+
      }
    }
 };
@@ -182,7 +189,7 @@ void taskSystemManager(void *pvParameters) {
             Serial.println("Timer Expired. Locking Door.");
             lock_door();
             // Stop the timer so it doesn't keep firing
-            timerAlarmDisable(doorTimer);
+            timerStop(doorTimer);
             continue;
         }
 
@@ -194,7 +201,7 @@ void taskSystemManager(void *pvParameters) {
             // Fixed: Convert String to C-string for comparison
             if (strcmp(msg.text, CORRECT_PASSWORD.c_str()) == 0) {
                 Serial.println("Correct! Unlocking...");
-                unlock_door_action();  // Unlocks and starts timer
+                passwd_correct();  // Unlocks and starts timer
             } else {
                 Serial.println("Wrong Password");
                 passwd_incorrect();               // Show error
@@ -225,9 +232,10 @@ void setup()
     //================= 2 ESPS ======================//
 
     //TIMER
-    doorTimer = timerBegin(0, 80, true);
-    timerAttachInterrupt(doorTimer, &onDoorTimerExpire, true);
-    timerAlarmWrite(doorTimer, UNLOCK_TIME_US, false);
+    doorTimer = timerBegin(1000000);
+    timerAttachInterrupt(doorTimer, &onDoorTimerExpire);
+    timerAlarm(doorTimer, UNLOCK_TIME_US, false, 0);
+    timerStop(doorTimer);
     //TIMER
 
 
