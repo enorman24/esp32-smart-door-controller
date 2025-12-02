@@ -26,6 +26,13 @@
 #define ADDR 8 //address in I2C connection
 #define BUZZER_PIN 19 // buzzer pin
 
+const uint32_t LOW_FREQ    = 50;
+const uint32_t MEDIUM_FREQ = 500;
+const uint32_t HIGH_FREQ   = 10000;
+
+const uint8_t  RESOLUTION     = 12;
+
+
 /** @brief Servo instance that drives the door mechanism. */
 Servo myServo;
 
@@ -122,9 +129,14 @@ void TaskBuzzer(void *parameter) {
   int msg;
   while (1) {
     if (xQueueReceive(xBuzzerQueue, &msg, portMAX_DELAY)) { //true if it receives
-      digitalWrite(BUZZER_PIN, HIGH); //buzzer high for one second
-      vTaskDelay(1000 / portTICK_PERIOD_MS); // Non-blocking delay
-      digitalWrite(BUZZER_PIN, LOW);
+      ledcWrite(BUZZER_PIN, DUTY_CYCLE); 
+      ledcWriteTone(BUZZER_PIN, LOW_FREQ); 
+      vTaskDelay(1000 / portTICK_PERIOD_MS);
+      ledcWriteTone(BUZZER_PIN, MEDIUM_FREQ);
+      vTaskDelay(1000 / portTICK_PERIOD_MS);
+      ledcWriteTone(BUZZER_PIN, HIGH_FREQ);
+      vTaskDelay(1000 / portTICK_PERIOD_MS);
+      ledcWrite(BUZZER_PIN, 0); 
     }
   }
 }
@@ -206,7 +218,8 @@ void setup() {
 
   //IO PINS
   pinMode(PIR_PIN, INPUT);
-  pinMode(BUZZER_PIN, OUTPUT);
+  ledcAttach(BUZZER_PIN, LOW_FREQ, RESOLUTION);
+  ledcWrite(BUZZER_PIN, 0);                    
   //IO PINS
 
   //Servo and Sensor setup
