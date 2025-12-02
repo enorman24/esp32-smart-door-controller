@@ -31,6 +31,8 @@ const uint32_t MEDIUM_FREQ = 500;
 const uint32_t HIGH_FREQ   = 10000;
 
 const uint8_t  RESOLUTION     = 12;
+const uint16_t MAX_DUTY_CYCLE = (1 << RESOLUTION) - 1;
+const uint16_t DUTY_CYCLE     = (MAX_DUTY_CYCLE >> 1);
 
 
 /** @brief Servo instance that drives the door mechanism. */
