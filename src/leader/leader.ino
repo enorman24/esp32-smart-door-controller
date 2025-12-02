@@ -72,7 +72,7 @@ void lcd_correct(){
 void lcd_incorrect(){
     lcd.clear();
     lcd.setCursor(0,0);
-    lcd.print("Wrong Passwd");
+    lcd.print("Wrong Password");
 }
 
 void lcd_locked(){
