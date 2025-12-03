@@ -14,26 +14,24 @@
  * All real-time behavior is implemented using FreeRTOS tasks, ISRs, and queues.
  */
 
-#include <Wire.h>
-#include <ESP32Servo.h>
-#include <Arduino.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h" //for tasks
+#include <Arduino.h>
+#include <ESP32Servo.h>
+#include <Wire.h>
 
-
-#define SERVO_PIN 18 //motor pin
-#define PIR_PIN 4 // motion sensor pin
-#define ADDR 8 //address in I2C connection
+#define SERVO_PIN 18  // motor pin
+#define PIR_PIN 4     // motion sensor pin
+#define ADDR 8        // address in I2C connection
 #define BUZZER_PIN 19 // buzzer pin
 
-const uint32_t LOW_FREQ    = 50;
+const uint32_t LOW_FREQ = 50;
 const uint32_t MEDIUM_FREQ = 500;
-const uint32_t HIGH_FREQ   = 10000;
+const uint32_t HIGH_FREQ = 10000;
 
-const uint8_t  RESOLUTION     = 12;
+const uint8_t RESOLUTION = 12;
 const uint16_t MAX_DUTY_CYCLE = (1 << RESOLUTION) - 1;
-const uint16_t DUTY_CYCLE     = (MAX_DUTY_CYCLE >> 1);
-
+const uint16_t DUTY_CYCLE = (MAX_DUTY_CYCLE >> 1);
 
 /** @brief Servo instance that drives the door mechanism. */
 Servo myServo;
@@ -69,7 +67,6 @@ QueueHandle_t xI2cQueue;
 QueueHandle_t xBuzzerQueue;
 
 //===========QUEUES==============//
-
 
 //===========ISRs=============//
 
@@ -131,15 +128,16 @@ void onReceive(int len) {
 void TaskBuzzer(void *parameter) {
   int msg;
   while (1) {
-    if (xQueueReceive(xBuzzerQueue, &msg, portMAX_DELAY)) { //true if it receives
-      ledcWrite(BUZZER_PIN, DUTY_CYCLE); 
-      ledcWriteTone(BUZZER_PIN, LOW_FREQ); 
+    if (xQueueReceive(xBuzzerQueue, &msg,
+                      portMAX_DELAY)) { // true if it receives
+      ledcWrite(BUZZER_PIN, DUTY_CYCLE);
+      ledcWriteTone(BUZZER_PIN, LOW_FREQ);
       vTaskDelay(1000 / portTICK_PERIOD_MS);
       ledcWriteTone(BUZZER_PIN, MEDIUM_FREQ);
       vTaskDelay(1000 / portTICK_PERIOD_MS);
       ledcWriteTone(BUZZER_PIN, HIGH_FREQ);
       vTaskDelay(1000 / portTICK_PERIOD_MS);
-      ledcWrite(BUZZER_PIN, 0); 
+      ledcWrite(BUZZER_PIN, 0);
     }
   }
 }
@@ -167,54 +165,44 @@ void TaskController(void *parameter) {
   int currentAngle = 0;
   int curr_state = 0; // 0 = Locked, 1 = Unlocked
   bool open = false;
-  bool alarmTriggered = false; 
+  bool alarmTriggered = false;
 
   while (1) {
     // Check for new commands from I2C
     if (xQueueReceive(xI2cQueue, &command, 0) == pdTRUE) {
-      if (command == 1) { 
+      if (command == 1) {
         curr_state = 1; // Unlock
       } else {
         curr_state = 0; // Lock
-      }   
+      }
     }
 
     if (curr_state == 1) {
       // UNLOCKED STATE
       // Open only if motion is detected
-      if (pirState) {
-        if (!open) {
-          currentAngle = 360;
-          myServo.write(currentAngle);
-          open = true;
-        }
-      } else {
-        // No motion, close the door
-        if (open) {
-          currentAngle = 0;
-          myServo.write(currentAngle); 
-          open = false;
-        }
+      if (pirState && !open) {
+        currentAngle = 360;
+        myServo.write(currentAngle);
+        open = true;
       }
       // Ensure alarm trigger is reset when unlocked
       alarmTriggered = false;
-
     } else {
       // LOCKED STATE
       // Ensure door is closed
       if (open) {
         currentAngle = 0;
-        myServo.write(currentAngle); 
+        myServo.write(currentAngle);
         open = false;
       }
 
       // Check for motion to trigger alarm
       if (pirState) {
         if (!alarmTriggered) {
-          int trigger = 1; 
-          if(uxQueueSpacesAvailable(xBuzzerQueue) > 0) {
-             xQueueSend(xBuzzerQueue, &trigger, 0);
-             alarmTriggered = true;
+          int trigger = 1;
+          if (uxQueueSpacesAvailable(xBuzzerQueue) > 0) {
+            xQueueSend(xBuzzerQueue, &trigger, 0);
+            alarmTriggered = true;
           }
         }
       } else {
@@ -226,9 +214,7 @@ void TaskController(void *parameter) {
   }
 }
 
-
 //===========CONTROLLER TASK==============//
-
 
 /**
  * @brief Arduino setup function.
@@ -246,54 +232,39 @@ void TaskController(void *parameter) {
 void setup() {
   Serial.begin(115200);
 
-  //I2C
+  // I2C
   Wire.onReceive(onReceive);
-  Wire.begin(ADDR); 
-  //I2C
+  Wire.begin(ADDR);
+  // I2C
 
-  //IO PINS
+  // IO PINS
   pinMode(PIR_PIN, INPUT);
   ledcAttach(BUZZER_PIN, LOW_FREQ, RESOLUTION);
-  ledcWrite(BUZZER_PIN, 0);                    
-  //IO PINS
+  ledcWrite(BUZZER_PIN, 0);
+  // IO PINS
 
-  //Servo and Sensor setup
+  // Servo and Sensor setup
   myServo.attach(SERVO_PIN, 500, 2400);
-  //Servo and Sensor setup
+  // Servo and Sensor setup
 
-  //QUEUE SETUP
-  xI2cQueue = xQueueCreate(10, sizeof(int)); 
+  // QUEUE SETUP
+  xI2cQueue = xQueueCreate(10, sizeof(int));
   xBuzzerQueue = xQueueCreate(5, sizeof(int));
-  //QUEUE SETUP
+  // QUEUE SETUP
 
-  //TIMER
+  // TIMER
   debounceTimer = timerBegin(1000000);
   timerStop(debounceTimer);
   timerAttachInterrupt(debounceTimer, &onTimerDebounce);
   timerAlarm(debounceTimer, 50000, false, 0);
-  attachInterrupt(digitalPinToInterrupt(PIR_PIN), onPIRChange, CHANGE); //digital pin to interrupt
-  //TIMER
+  attachInterrupt(digitalPinToInterrupt(PIR_PIN), onPIRChange,
+                  CHANGE); // digital pin to interrupt
+  // TIMER
 
   //================ FREERTOS TASKS ===============//
-  xTaskCreatePinnedToCore(
-    TaskController,
-    "Logic Task",
-    4096,
-    NULL,
-    1,
-    NULL,
-    0
-  );
+  xTaskCreatePinnedToCore(TaskController, "Logic Task", 4096, NULL, 1, NULL, 0);
 
-  xTaskCreatePinnedToCore(
-    TaskBuzzer,
-    "Buzzer Task",
-    4096,
-    NULL,
-    1,
-    NULL,
-    1
-  );
+  xTaskCreatePinnedToCore(TaskBuzzer, "Buzzer Task", 4096, NULL, 1, NULL, 1);
   //================ FREERTOS TASKS ===============//
 }
 
@@ -302,5 +273,4 @@ void setup() {
  *
  * Intentionally empty; all work is handled by FreeRTOS tasks and ISRs.
  */
-void loop() {
-}
+void loop() {}
