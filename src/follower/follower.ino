@@ -19,6 +19,8 @@
 #include <Arduino.h>
 #include <ESP32Servo.h>
 #include <Wire.h>
+#define I2C_SDA 8
+#define I2C_SCL 9
 
 #define SERVO_PIN 18  // motor pin
 #define PIR_PIN 4     // motion sensor pin
@@ -168,15 +170,20 @@ void TaskController(void *parameter) {
     if (xQueueReceive(xI2cQueue, &command, 0) == pdTRUE) {
       if (command == 1) {
         curr_state = 1; // Unlock
+        Serial.println("1");
+
       } else {
         curr_state = 0; // Lock
+        Serial.println("0");
+
       }
     }
-
     if (curr_state == 1) {
       // UNLOCKED STATE
       // Open door if motion is detected; door stays open until locked
       if (pirState && !open) {
+        Serial.println("open");
+
         currentAngle = 360;
         myServo.write(currentAngle);
         open = true;
@@ -187,6 +194,7 @@ void TaskController(void *parameter) {
       // LOCKED STATE
       // Ensure door is closed
       if (open) {
+        Serial.println("close");
         currentAngle = 0;
         myServo.write(currentAngle);
         open = false;
@@ -196,6 +204,8 @@ void TaskController(void *parameter) {
         if (!alarmTriggered) {
           int trigger = 1;
           if (uxQueueSpacesAvailable(xBuzzerQueue) > 0) {
+            Serial.println("alarm");
+
             xQueueSend(xBuzzerQueue, &trigger, 0);
             alarmTriggered = true;
             Serial.println("trigger");
@@ -230,7 +240,7 @@ void setup() {
 
   // I2C
   Wire.onReceive(onReceive);
-  Wire.begin(ADDR);
+  Wire.begin(ADDR, I2C_SDA, I2C_SCL, 100000);
   // I2C
 
   // IO PINS

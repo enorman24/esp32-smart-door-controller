@@ -23,6 +23,8 @@
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <string.h>
+#define I2C_SDA 8
+#define I2C_SCL 9
 
 
 #define FOLLOWER_ADDR 8
@@ -299,7 +301,7 @@ void setup()
     lcd.clear();
     lcd.setCursor(0,0);
     //================= 2 ESPS ======================//
-    Wire.begin();
+    Wire.begin(I2C_SDA, I2C_SCL);
     //================= TIMER ======================//
     doorTimer = timerBegin(1000000);
     timerAttachInterrupt(doorTimer, &onDoorTimerExpire);
