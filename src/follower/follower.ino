@@ -131,12 +131,8 @@ void TaskBuzzer(void *parameter) {
     if (xQueueReceive(xBuzzerQueue, &msg,
                       portMAX_DELAY)) { // true if it receives
       ledcWrite(BUZZER_PIN, DUTY_CYCLE);
-      ledcWriteTone(BUZZER_PIN, LOW_FREQ);
-      vTaskDelay(1000 / portTICK_PERIOD_MS);
       ledcWriteTone(BUZZER_PIN, MEDIUM_FREQ);
-      vTaskDelay(1000 / portTICK_PERIOD_MS);
-      ledcWriteTone(BUZZER_PIN, HIGH_FREQ);
-      vTaskDelay(1000 / portTICK_PERIOD_MS);
+      vTaskDelay(3000 / portTICK_PERIOD_MS);
       ledcWrite(BUZZER_PIN, 0);
     }
   }
@@ -202,6 +198,7 @@ void TaskController(void *parameter) {
           if (uxQueueSpacesAvailable(xBuzzerQueue) > 0) {
             xQueueSend(xBuzzerQueue, &trigger, 0);
             alarmTriggered = true;
+            Serial.println("trigger");
           }
         }
       } else {
