@@ -151,13 +151,13 @@ void TaskBuzzer(void *parameter) {
  * @brief Main controller task for servo and motion-locked behavior.
  *
  * Responsibilities:
- *  - Waits for lock/unlock commands from @ref xI2cQueue:
- *      - command == 1: unlock — sets @c currentAngle to 360 and writes it
- *        to the servo (door open).
- *      - any other command: lock request — if @ref pirState is HIGH (motion
- *        detected), it:
- *          - sends a trigger to @ref xBuzzerQueue to sound the alarm.
- *          - sets @c currentAngle to 0 and writes it to the servo (door closed).
+ *  - Waits for lock/unlock commands from @ref xI2cQueue.
+ *  - **Unlocked State** (command == 1):
+ *      - If motion detected (@ref pirState HIGH): Opens door (servo 360).
+ *      - If no motion: Closes door (servo 0).
+ *  - **Locked State** (command == 0):
+ *      - Ensures door is closed (servo 0).
+ *      - If motion detected: Triggers buzzer alarm via @ref xBuzzerQueue.
  *  - Inserts a small periodic delay to yield CPU time.
  *
  * @param parameter Unused task parameter (required by FreeRTOS).
@@ -165,39 +165,63 @@ void TaskBuzzer(void *parameter) {
 void TaskController(void *parameter) {
   int command = 0;
   int currentAngle = 0;
-  int curr_state = 0;
+  int curr_state = 0; // 0 = Locked, 1 = Unlocked
   bool open = false;
   bool alarmTriggered = false; 
 
   while (1) {
+    // Check for new commands from I2C
     if (xQueueReceive(xI2cQueue, &command, 0) == pdTRUE) {
       if (command == 1) { 
-        curr_state = 1; 
-      } else if (command == 0) {
-        if(open) {
+        curr_state = 1; // Unlock
+      } else {
+        curr_state = 0; // Lock
+      }   
+    }
+
+    if (curr_state == 1) {
+      // UNLOCKED STATE
+      // Open only if motion is detected
+      if (pirState) {
+        if (!open) {
+          currentAngle = 360;
+          myServo.write(currentAngle);
+          open = true;
+        }
+      } else {
+        // No motion, close the door
+        if (open) {
           currentAngle = 0;
           myServo.write(currentAngle); 
           open = false;
         }
-        curr_state = 0;
-      }   
-    }
-    if (pirState && curr_state == 1) {
-        currentAngle = 360;
-        myServo.write(currentAngle);
-        open = true;
-    }
-    if (pirState) {
-      if (curr_state == 0 && !alarmTriggered) {
-        int trigger = 1; 
-        if(uxQueueSpacesAvailable(xBuzzerQueue) > 0) {
-           xQueueSend(xBuzzerQueue, &trigger, 0);
-           alarmTriggered = true;
-        }
       }
-    } else {
+      // Ensure alarm trigger is reset when unlocked
       alarmTriggered = false;
+
+    } else {
+      // LOCKED STATE
+      // Ensure door is closed
+      if (open) {
+        currentAngle = 0;
+        myServo.write(currentAngle); 
+        open = false;
+      }
+
+      // Check for motion to trigger alarm
+      if (pirState) {
+        if (!alarmTriggered) {
+          int trigger = 1; 
+          if(uxQueueSpacesAvailable(xBuzzerQueue) > 0) {
+             xQueueSend(xBuzzerQueue, &trigger, 0);
+             alarmTriggered = true;
+          }
+        }
+      } else {
+        alarmTriggered = false;
+      }
     }
+
     vTaskDelay(pdMS_TO_TICKS(8));
   }
 }
