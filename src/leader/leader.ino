@@ -14,29 +14,28 @@
  *    the door after a fixed interval.
  */
 
-#include <Arduino.h>
-#include <LiquidCrystal_I2C.h> //for using the lcd display
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h" //for tasks
-#include <Wire.h> // for using 2 esp32s
+#include <Arduino.h>
 #include <BLEDevice.h>
-#include <BLEUtils.h>
 #include <BLEServer.h>
+#include <BLEUtils.h>
+#include <LiquidCrystal_I2C.h> //for using the lcd display
+#include <Wire.h>              // for using 2 esp32s
 #include <string.h>
 #define I2C_SDA 8
 #define I2C_SCL 9
 
-
 #define FOLLOWER_ADDR 8
 #define MAX_PASS_LEN 20
 //================ BLE STUFF ======================//
-#define SERVICE_UUID        "56be7035-a164-4929-854d-ab699176f9fd"
+#define SERVICE_UUID "56be7035-a164-4929-854d-ab699176f9fd"
 #define CHARACTERISTIC_UUID "8e4b2914-ba59-432f-a51b-b66dee7838b7"
 //================ Password ==================//
-const String CORRECT_PASSWORD = "12345"; 
+const String CORRECT_PASSWORD = "12345";
 
 //===========HARDWARE TIMER===========//
-hw_timer_t * doorTimer = NULL;
+hw_timer_t *doorTimer = NULL;
 #define PRESCALER 80
 #define UNLOCK_TIME_US 20000000
 //===========QUEUE==============//
@@ -47,10 +46,10 @@ hw_timer_t * doorTimer = NULL;
  *
  * Used by the manager task to dispatch messages based on their origin.
  */
-enum InputSource { 
-    S_SERIAL,      /**< Message came from serial input. */
-    S_BLE,         /**< Message came from BLE input. */
-    S_LOCK_TIMER   /**< Message came from the hardware auto-lock timer ISR. */
+enum InputSource {
+  S_SERIAL,    /**< Message came from serial input. */
+  S_BLE,       /**< Message came from BLE input. */
+  S_LOCK_TIMER /**< Message came from the hardware auto-lock timer ISR. */
 };
 
 /**
@@ -62,8 +61,8 @@ enum InputSource {
  *  - Control messages from the lock timer ISR.
  */
 typedef struct {
-    char text[MAX_PASS_LEN];
-    InputSource source;       
+  char text[MAX_PASS_LEN];
+  InputSource source;
 } MessageForQueue;
 
 /** @brief Global handle for the system message queue. */
@@ -77,10 +76,10 @@ QueueHandle_t xSystemQueue;
  */
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-void lcd_correct(){
-    lcd.clear();
-    lcd.setCursor(0,0);
-    lcd.print("Unlocked");
+void lcd_correct() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Unlocked");
 }
 
 /**
@@ -88,10 +87,10 @@ void lcd_correct(){
  *
  * Used after an incorrect password attempt.
  */
-void lcd_incorrect(){
-    lcd.clear();
-    lcd.setCursor(0,0);
-    lcd.print("Wrong Password");
+void lcd_incorrect() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Wrong Password");
 }
 
 /**
@@ -99,10 +98,10 @@ void lcd_incorrect(){
  *
  * Called when the door transitions to or remains in the locked state.
  */
-void lcd_locked(){
-    lcd.clear();
-    lcd.setCursor(0,0);
-    lcd.print("LOCKED");
+void lcd_locked() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("LOCKED");
 }
 //================ PASSWORD CONTROL =====================//
 
@@ -115,14 +114,14 @@ void lcd_locked(){
  *  - Starts the hardware timer that will re-lock the door after
  *    @c UNLOCK_TIME_US microseconds.
  */
-void passwd_correct(){
-    lcd_correct(); //display on lcd
-    Wire.beginTransmission(FOLLOWER_ADDR); //send message to esp32 #2
-    Wire.write(1);
-    Wire.endTransmission();
-    timerWrite(doorTimer, 0); 
-    timerStart(doorTimer); //start timer so the door 
-    //is closed after a set amount of time
+void passwd_correct() {
+  lcd_correct();                         // display on lcd
+  Wire.beginTransmission(FOLLOWER_ADDR); // send message to esp32 #2
+  Wire.write(1);
+  Wire.endTransmission();
+  timerWrite(doorTimer, 0);
+  timerStart(doorTimer); // start timer so the door
+  // is closed after a set amount of time
 }
 
 /**
@@ -131,9 +130,7 @@ void passwd_correct(){
  * Only updates the LCD to show an error message. The manager task
  * is responsible for any additional delay and re-lock display logic.
  */
-void passwd_incorrect(){
-    lcd_incorrect();
-}
+void passwd_incorrect() { lcd_incorrect(); }
 
 /**
  * @brief Lock the door and update status.
@@ -142,11 +139,11 @@ void passwd_incorrect(){
  * to show the locked state. This is used at startup and when the
  * auto-lock timer expires.
  */
-void lock_door(){
-    Wire.beginTransmission(FOLLOWER_ADDR);
-    Wire.write(0);
-    Wire.endTransmission();
-    lcd_locked();
+void lock_door() {
+  Wire.beginTransmission(FOLLOWER_ADDR);
+  Wire.write(0);
+  Wire.endTransmission();
+  lcd_locked();
 }
 //================ BLE HANDER ===================//
 
@@ -160,20 +157,20 @@ void lock_door(){
  *  - Packages it into a @ref MessageForQueue with source @c S_BLE.
  *  - Sends the message to @ref xSystemQueue for processing by the manager task.
  */
-class MyCallbacks: public BLECharacteristicCallbacks {
-   void onWrite(BLECharacteristic *pCharacteristic) override {
-     String rxValue = pCharacteristic->getValue();
-     if (rxValue.length() > 0) {
-        MessageForQueue msg;
-        msg.source = S_BLE;
-        size_t len = rxValue.length();
-        if (len >= MAX_PASS_LEN) {
-            len = MAX_PASS_LEN - 1;
-        }
-        rxValue.toCharArray(msg.text, len + 1);
-        xQueueSend(xSystemQueue, &msg, 0);
-     }
-   }
+class MyCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *pCharacteristic) override {
+    String rxValue = pCharacteristic->getValue();
+    if (rxValue.length() > 0) {
+      MessageForQueue msg;
+      msg.source = S_BLE;
+      size_t len = rxValue.length();
+      if (len >= MAX_PASS_LEN) {
+        len = MAX_PASS_LEN - 1;
+      }
+      rxValue.toCharArray(msg.text, len + 1);
+      xQueueSend(xSystemQueue, &msg, 0);
+    }
+  }
 };
 //================TIMER ISR ====================//
 
@@ -190,15 +187,16 @@ class MyCallbacks: public BLECharacteristicCallbacks {
  *       deferred to @ref taskSystemManager via the queue.
  */
 void IRAM_ATTR onDoorTimerExpire() {
-    MessageForQueue msg;
-    msg.source = S_LOCK_TIMER;
-    strcpy(msg.text, "LOCK"); //doesn't matter 
-    
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    xQueueSendFromISR(xSystemQueue, &msg, &xHigherPriorityTaskWoken);
-    if (xHigherPriorityTaskWoken){ //guard for if there is a higher priority task
-        portYIELD_FROM_ISR();
-    } 
+  MessageForQueue msg;
+  msg.source = S_LOCK_TIMER;
+  strcpy(msg.text, "LOCK"); // doesn't matter
+
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  xQueueSendFromISR(xSystemQueue, &msg, &xHigherPriorityTaskWoken);
+  if (xHigherPriorityTaskWoken) { // guard for if there is a higher priority
+                                  // task
+    portYIELD_FROM_ISR();
+  }
 }
 //================== INPUT =====================//
 
@@ -214,28 +212,27 @@ void IRAM_ATTR onDoorTimerExpire() {
  * @param pvParameters Unused task parameter (required by FreeRTOS signature).
  */
 void taskSerialInput(void *pvParameters) {
-    String curr = "";
-    while(1) {
-        while (Serial.available()) {
-            char c = Serial.read();
-            if (c == '\n') {
-                curr.trim();
-                if (curr.length() > 0) {
-                    MessageForQueue msg;
-                    msg.source = S_SERIAL;
-                    curr.toCharArray(msg.text, MAX_PASS_LEN); //queue holds char array
-                    xQueueSend(xSystemQueue, &msg, 10);
-                }
-                curr = "";
-            }
-            else if (c != '\r') {
-                if (curr.length() < MAX_PASS_LEN - 1) {
-                    curr += c;
-                }
-            }
+  String curr = "";
+  while (1) {
+    while (Serial.available()) {
+      char c = Serial.read();
+      if (c == '\n') {
+        curr.trim();
+        if (curr.length() > 0) {
+          MessageForQueue msg;
+          msg.source = S_SERIAL;
+          curr.toCharArray(msg.text, MAX_PASS_LEN); // queue holds char array
+          xQueueSend(xSystemQueue, &msg, 10);
         }
-        vTaskDelay(pdMS_TO_TICKS(20));
+        curr = "";
+      } else if (c != '\r') {
+        if (curr.length() < MAX_PASS_LEN - 1) {
+          curr += c;
+        }
+      }
     }
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
 }
 // ================= MANAGER TASK (CONSUMER) ================== //
 
@@ -256,26 +253,26 @@ void taskSerialInput(void *pvParameters) {
  * @param pvParameters Unused task parameter (required by FreeRTOS signature).
  */
 void taskSystemManager(void *pvParameters) {
-    MessageForQueue msg;
-    lock_door(); //initially locked
-    while(1) {
-        if (xQueueReceive(xSystemQueue, &msg, portMAX_DELAY) == pdPASS) {
-            if (msg.source == S_LOCK_TIMER) {
-                lock_door();
-                timerStop(doorTimer);
-            } else if (msg.source == S_BLE || msg.source == S_SERIAL) {
-                //compares strings char by char -> important because one is a string
-                //tand he other is a character array
-                if (strcmp(msg.text, CORRECT_PASSWORD.c_str()) == 0) { 
-                    passwd_correct();
-                } else {
-                    passwd_incorrect();               
-                    vTaskDelay(pdMS_TO_TICKS(3000));
-                    lcd_locked();                     
-                }
-            }
+  MessageForQueue msg;
+  lock_door(); // initially locked
+  while (1) {
+    if (xQueueReceive(xSystemQueue, &msg, portMAX_DELAY) == pdPASS) {
+      if (msg.source == S_LOCK_TIMER) {
+        lock_door();
+        timerStop(doorTimer);
+      } else if (msg.source == S_BLE || msg.source == S_SERIAL) {
+        // compares strings char by char -> important because one is a string
+        // tand he other is a character array
+        if (strcmp(msg.text, CORRECT_PASSWORD.c_str()) == 0) {
+          passwd_correct();
+        } else {
+          passwd_incorrect();
+          vTaskDelay(pdMS_TO_TICKS(3000));
+          lcd_locked();
         }
+      }
     }
+  }
 }
 
 /**
@@ -291,63 +288,47 @@ void taskSystemManager(void *pvParameters) {
  *  - FreeRTOS tasks @ref taskSerialInput and @ref taskSystemManager,
  *    pinned to separate cores.
  */
-void setup() 
-{
-    Serial.begin(115200);
+void setup() {
+  Serial.begin(115200);
 
-    //================ LCD STUFF ======================//
-    lcd.init();
-    lcd.backlight();
-    lcd.clear();
-    lcd.setCursor(0,0);
-    //================= 2 ESPS ======================//
-    Wire.begin(I2C_SDA, I2C_SCL);
-    //================= TIMER ======================//
-    doorTimer = timerBegin(1000000);
-    timerAttachInterrupt(doorTimer, &onDoorTimerExpire);
-    timerAlarm(doorTimer, UNLOCK_TIME_US, false, 0);
-    timerStop(doorTimer);
-    //================= CREATE QUEUES ======================//
-    xSystemQueue = xQueueCreate(10, sizeof(MessageForQueue));
-    if(xSystemQueue == NULL){
-        Serial.println("Error creating the queue");
-    }
-    //================ BLE STUFF ======================//
-    BLEDevice::init("MelihElliotESP");
-    BLEServer *pServer = BLEDevice::createServer();
-    BLEService *pService = pServer->createService(SERVICE_UUID);
-    BLECharacteristic *pCharacteristic = pService->createCharacteristic(
-        CHARACTERISTIC_UUID,
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
-    );
+  //================ LCD STUFF ======================//
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  //================= 2 ESPS ======================//
+  Wire.begin(I2C_SDA, I2C_SCL);
+  //================= TIMER ======================//
+  doorTimer = timerBegin(1000000);
+  timerAttachInterrupt(doorTimer, &onDoorTimerExpire);
+  timerAlarm(doorTimer, UNLOCK_TIME_US, false, 0);
+  timerStop(doorTimer);
+  //================= CREATE QUEUES ======================//
+  xSystemQueue = xQueueCreate(10, sizeof(MessageForQueue));
+  if (xSystemQueue == NULL) {
+    Serial.println("Error creating the queue");
+  }
+  //================ BLE STUFF ======================//
+  BLEDevice::init("MelihElliotESP");
+  BLEServer *pServer = BLEDevice::createServer();
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+  BLECharacteristic *pCharacteristic = pService->createCharacteristic(
+      CHARACTERISTIC_UUID,
+      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
 
-    pCharacteristic->setCallbacks(new MyCallbacks());
-    pService->start();
+  pCharacteristic->setCallbacks(new MyCallbacks());
+  pService->start();
 
-    BLEAdvertising *pAdvertising = pServer->getAdvertising();
-    pAdvertising->start();
+  BLEAdvertising *pAdvertising = pServer->getAdvertising();
+  pAdvertising->start();
 
-    //================ FREERTOS TASKS ===============//
-    xTaskCreatePinnedToCore(
-        taskSerialInput,
-        "SerialTask",
-        4096,
-        NULL,
-        1,
-        NULL,
-        0
-    );
+  //================ FREERTOS TASKS ===============//
+  xTaskCreatePinnedToCore(taskSerialInput, "SerialTask", 4096, NULL, 1, NULL,
+                          0);
 
-    xTaskCreatePinnedToCore(
-        taskSystemManager,
-        "ManagerTask",
-        4096,
-        NULL,
-        1,
-        NULL,
-        1
-    );
-    //================ FREERTOS TASKS ===============//
+  xTaskCreatePinnedToCore(taskSystemManager, "ManagerTask", 4096, NULL, 1, NULL,
+                          1);
+  //================ FREERTOS TASKS ===============//
 }
 
 /**
@@ -356,7 +337,4 @@ void setup()
  * Left empty because all behavior is implemented using FreeRTOS tasks
  * and interrupt handlers.
  */
-void loop()
-{
-
-}
+void loop() {}

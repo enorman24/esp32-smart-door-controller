@@ -22,10 +22,10 @@
 #define I2C_SDA 8
 #define I2C_SCL 9
 
-#define SERVO_PIN 18  // motor pin
-#define PIR_PIN 4     // motion sensor pin
-#define ADDR 8        // address in I2C connection
-#define BUZZER_PIN 19 // buzzer pin
+#define SERVO_PIN 5  // motor pin (Changed from 18 to avoid USB_SEL conflict)
+#define PIR_PIN 4    // motion sensor pin
+#define ADDR 8       // address in I2C connection
+#define BUZZER_PIN 6 // buzzer pin (Changed from 19 to avoid USB D- conflict)
 
 const uint32_t LOW_FREQ = 50;
 const uint32_t MEDIUM_FREQ = 500;
@@ -160,7 +160,7 @@ void TaskBuzzer(void *parameter) {
  */
 void TaskController(void *parameter) {
   int command = 0;
-  int currentAngle = 0;
+  int currentAngle = 360;
   int curr_state = 0; // 0 = Locked, 1 = Unlocked
   bool open = false;
   bool alarmTriggered = false;
@@ -170,22 +170,17 @@ void TaskController(void *parameter) {
     if (xQueueReceive(xI2cQueue, &command, 0) == pdTRUE) {
       if (command == 1) {
         curr_state = 1; // Unlock
-        Serial.println("1");
-
       } else {
         curr_state = 0; // Lock
-        Serial.println("0");
-
       }
     }
     if (curr_state == 1) {
       // UNLOCKED STATE
       // Open door if motion is detected; door stays open until locked
       if (pirState && !open) {
-        Serial.println("open");
-
-        currentAngle = 360;
+        currentAngle = 0;
         myServo.write(currentAngle);
+        vTaskDelay(500 / portTICK_PERIOD_MS);
         open = true;
       }
       // Ensure alarm trigger is reset when unlocked
@@ -194,21 +189,18 @@ void TaskController(void *parameter) {
       // LOCKED STATE
       // Ensure door is closed
       if (open) {
-        Serial.println("close");
-        currentAngle = 0;
+        currentAngle = 180;
         myServo.write(currentAngle);
         open = false;
+        vTaskDelay(500 / portTICK_PERIOD_MS);
       }
       // Check for motion to trigger alarm
       if (pirState) {
         if (!alarmTriggered) {
           int trigger = 1;
           if (uxQueueSpacesAvailable(xBuzzerQueue) > 0) {
-            Serial.println("alarm");
-
             xQueueSend(xBuzzerQueue, &trigger, 0);
             alarmTriggered = true;
-            Serial.println("trigger");
           }
         }
       } else {
@@ -243,15 +235,17 @@ void setup() {
   Wire.begin(ADDR, I2C_SDA, I2C_SCL, 100000);
   // I2C
 
+  // Servo and Sensor setup
+  ESP32PWM::allocateTimer(0);
+  myServo.setPeriodHertz(50);
+  myServo.attach(SERVO_PIN, 500, 2400);
+  // Servo and Sensor setup
+
   // IO PINS
   pinMode(PIR_PIN, INPUT);
   ledcAttach(BUZZER_PIN, LOW_FREQ, RESOLUTION);
   ledcWrite(BUZZER_PIN, 0);
   // IO PINS
-
-  // Servo and Sensor setup
-  myServo.attach(SERVO_PIN, 500, 2400);
-  // Servo and Sensor setup
 
   // QUEUE SETUP
   xI2cQueue = xQueueCreate(10, sizeof(int));
