@@ -179,7 +179,7 @@ void TaskController(void *parameter) {
 
     if (curr_state == 1) {
       // UNLOCKED STATE
-      // Open only if motion is detected
+      // Open door if motion is detected; door stays open until locked
       if (pirState && !open) {
         currentAngle = 360;
         myServo.write(currentAngle);
@@ -195,7 +195,6 @@ void TaskController(void *parameter) {
         myServo.write(currentAngle);
         open = false;
       }
-
       // Check for motion to trigger alarm
       if (pirState) {
         if (!alarmTriggered) {
